@@ -1,6 +1,9 @@
 package com.xw.ltt.excel;
 
+import com.xw.ltt.Test;
 import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.streaming.SXSSFSheet;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import java.io.File;
@@ -11,25 +14,41 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class ExcelUtil {
 
-    public static void mergeExcelFiles(File file, List<InputStream> list) throws IOException {
-        Path titleTemplatePath = Paths.get("表头模板/卡片数据.xlsx");
-        InputStream inputStream = Files.newInputStream(titleTemplatePath);
-        XSSFWorkbook book = new XSSFWorkbook(inputStream);
-        Sheet sheet = book.getSheetAt(0);
+    private static boolean isFirstExcel = true;
 
-        for (InputStream fin : list) {
-            XSSFWorkbook b = new XSSFWorkbook(fin);
-//            for (int i = 0; i < b.getNumberOfSheets(); i++) {
-//                copySheets(book, sheet, b.getSheetAt(i));
-//            }
+    public static void mergeExcelFiles(File file, Map<String, InputStream> excelFiles) throws IOException {
+        Path templatePath = Paths.get(Test.WORK_DIR + "表头模板/卡片数据.xlsx");
+        InputStream templateIn = Files.newInputStream(templatePath);
+        XSSFWorkbook templateBook = new XSSFWorkbook(templateIn);
 
+        SXSSFWorkbook book = new SXSSFWorkbook(templateBook);
+        SXSSFSheet sheet = book.getSheetAt(0);
+
+        excelFiles.forEach((name, in) -> {
+            XSSFWorkbook b;
+            try {
+                b = new XSSFWorkbook(in);
+            } catch (IOException e) {
+                e.printStackTrace();
+                throw new RuntimeException("读取" + name + "出错");
+            }
+
+            System.out.println("正在合并【" + name + "】...");
             copySheets(book, sheet, b.getSheetAt(2));
-        }
+        });
+
+//        for (InputStream fin : list) {
+//            XSSFWorkbook b = new XSSFWorkbook(fin);
+////            for (int i = 0; i < b.getNumberOfSheets(); i++) {
+////                copySheets(book, sheet, b.getSheetAt(i));
+////            }
+//
+//            copySheets(book, sheet, b.getSheetAt(2));
+//        }
 
         try {
             writeFile(book, file);
@@ -39,20 +58,26 @@ public class ExcelUtil {
         }
     }
 
-    protected static void writeFile(XSSFWorkbook book, File file) throws Exception {
+    private static void writeFile(SXSSFWorkbook book, File file) throws Exception {
         FileOutputStream out = new FileOutputStream(file);
         book.write(out);
         out.close();
     }
 
-    private static void copySheets(XSSFWorkbook newWorkbook, Sheet newSheet, Sheet sheet) {
+    private static void copySheets(SXSSFWorkbook newWorkbook, Sheet newSheet, Sheet sheet) {
         copySheets(newWorkbook, newSheet, sheet, true);
     }
 
-    private static void copySheets(XSSFWorkbook newWorkbook, Sheet newSheet, Sheet sheet, boolean copyStyle) {
-        int newRowNum = newSheet.getLastRowNum() - 3; //i的初始值为4
+    private static void copySheets(SXSSFWorkbook newWorkbook, Sheet newSheet, Sheet sheet, boolean copyStyle) {
+        int newRowNum = newSheet.getLastRowNum();
+        if (isFirstExcel) {
+            newRowNum += 1;
+            isFirstExcel = false;
+        } else {
+            newRowNum -= 3;
+        }
         int maxColumnNum = 0;
-        Map<Integer, CellStyle> styleMap = (copyStyle) ? new HashMap<Integer, CellStyle>() : null;
+        Map<Integer, CellStyle> styleMap = copyStyle ? new HashMap<>() : null;
 
 //        for (int i = sheet.getFirstRowNum(); i <= sheet.getLastRowNum(); i++) {
         for (int i = 4; i <= sheet.getLastRowNum(); i++) {
@@ -69,7 +94,7 @@ public class ExcelUtil {
         }
     }
 
-    public static void copyRow(XSSFWorkbook newWorkbook, Row srcRow, Row destRow, Map<Integer, CellStyle> styleMap) {
+    private static void copyRow(SXSSFWorkbook newWorkbook, Row srcRow, Row destRow, Map<Integer, CellStyle> styleMap) {
         destRow.setHeight(srcRow.getHeight());
         for (int j = srcRow.getFirstCellNum(); j <= srcRow.getLastCellNum(); j++) {
             Cell oldCell = srcRow.getCell(j);
@@ -83,7 +108,7 @@ public class ExcelUtil {
         }
     }
 
-    public static void copyCell(XSSFWorkbook newWorkbook, Cell oldCell, Cell newCell, Map<Integer, CellStyle> styleMap) {
+    private static void copyCell(SXSSFWorkbook newWorkbook, Cell oldCell, Cell newCell, Map<Integer, CellStyle> styleMap) {
         if (styleMap != null) {
             int stHashCode = oldCell.getCellStyle().hashCode();
             CellStyle newCellStyle = styleMap.get(stHashCode);
