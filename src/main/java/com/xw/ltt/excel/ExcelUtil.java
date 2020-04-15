@@ -56,7 +56,7 @@ public class ExcelUtil {
                 for (int j = 0; j <= sheet.getLastRowNum(); j++) {
                     Row row = sheet.getRow(j);
                     if (row != null && row.getCell(0) == null) {
-                        sheet.removeRow(row);
+                        sheet.removeRow(row); //删除行后，sheet.getLastRowNum()的值不会变
                     }
                 }
                 mainSheetLastRowNum = sheet.getLastRowNum();
@@ -159,7 +159,7 @@ public class ExcelUtil {
                 newCell.setCellValue(oldCell.getNumericCellValue());
                 break;
             case BLANK:
-                newCell.setCellType(CellType.BLANK);
+                newCell.setBlank();
                 break;
             case BOOLEAN:
                 newCell.setCellValue(oldCell.getBooleanCellValue());
