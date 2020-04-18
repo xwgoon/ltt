@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 public class Test {
 
-    private static final String WORK_DIR;
+    public static final String WORK_DIR;
     public static int sheetNum;
     public static int titleRowNum;
     public static boolean isSuccess = true;
@@ -28,7 +28,7 @@ public class Test {
             e.printStackTrace();
             throw new RuntimeException("获取jar文件出错");
         }
-        WORK_DIR = jarFile.getParent() + "/";
+        WORK_DIR = jarFile.getParent() + "\\";
     }
 
     public static void main(String[] args) throws Exception {
