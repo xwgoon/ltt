@@ -1,6 +1,7 @@
 package com.xw.ltt;
 
 import com.xw.ltt.excel.ExcelUtil;
+import com.xw.ltt.vo.Sum;
 
 import java.io.File;
 import java.io.IOException;
@@ -18,6 +19,7 @@ public class Test {
     public static final String WORK_DIR;
     public static int sheetNum;
     public static int titleRowNum;
+    public static boolean isCard = true;
     public static boolean isSuccess = true;
 
     static {
@@ -28,7 +30,7 @@ public class Test {
             e.printStackTrace();
             throw new RuntimeException("获取jar文件出错");
         }
-        WORK_DIR = jarFile.getParent() + "\\";
+        WORK_DIR = jarFile.getParent() + "/";
     }
 
     public static void main(String[] args) throws Exception {
@@ -63,7 +65,7 @@ public class Test {
 //        }
 
         for (; ; ) {
-            System.out.print("请输入表的位置（大于0的整数）：");
+            System.out.println("请输入表的位置（大于0的整数）：");
             Scanner in = new Scanner(System.in);
             try {
                 sheetNum = in.nextInt();
@@ -74,7 +76,7 @@ public class Test {
         }
 
         for (; ; ) {
-            System.out.print("请输入表头行数（大于等于0的整数）：");
+            System.out.println("请输入表头行数（大于等于0的整数）：");
             Scanner in = new Scanner(System.in);
             try {
                 titleRowNum = in.nextInt();
@@ -119,6 +121,8 @@ public class Test {
         } else {
             System.out.println("合并失败。\n");
         }
+
+        System.out.println(new Sum());
 
         System.out.println("请按回车键结束...");
         System.in.read();

@@ -3,6 +3,7 @@ package com.xw.ltt.excel;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.WinReg;
 import com.xw.ltt.Test;
+import com.xw.ltt.vo.Sum;
 import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -14,23 +15,20 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 public class ExcelUtil {
 
-    private static Path TEMP_DIR;
-    private static final String EXCEL_PATH;
-
-    static {
-        EXCEL_PATH = Advapi32Util.registryGetStringValue(
-                WinReg.HKEY_LOCAL_MACHINE, //HKEY
-                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\excel.exe", //Key
-                "Path"
-        );
-    }
+    private static Path tmpDir;
+    private static String excelCnvDir;
+    private static SXSSFWorkbook mainBook = null;
+    private static SXSSFSheet mainSheet = null;
 
     static class A {
 
@@ -47,23 +45,33 @@ public class ExcelUtil {
 
 //        System.out.println(System.getenv());
 
-        String property = "java.io.tmpdir";
+//        String property = "java.io.tmpdir";
 
         // Get the temporary directory and print it.
-        String tempDir = System.getProperty(property);
-        System.out.println("OS temporary directory is " + tempDir);
+//        String tempDir = System.getProperty(property);
+//        System.out.println("OS temporary directory is " + tempDir);
 
+//        double d = 0.1 + 0.2;
+//        System.out.println(d);
+//        System.out.println(String.valueOf(d));
+//        System.out.println(Double.toString(d));
+//        System.out.println(new BigDecimal(Double.toString(d)));
+
+
+        System.out.println(ChronoUnit.DAYS.between(LocalDate.of(2003, 4, 1), LocalDate.of(1900, 1, 1)));
     }
 
     private static boolean isFirstExcel = true;
     private static int mainSheetLastRowNum;
+    private static String[] cellValArr = new String[30];
 
     private static Workbook createBook(Path path, String fileName) {
         System.out.println("正在合并【" + fileName + "】...");
         try (InputStream in = Files.newInputStream(path)) { //用完流后要关闭，否则后面无法删除临时文件夹
             Workbook book = WorkbookFactory.create(in);
             if (Test.sheetNum > book.getNumberOfSheets()) {
-                System.out.println("您输入的表位置" + Test.sheetNum + "非法，【" + fileName + "】文件共有" + book.getNumberOfSheets() + "张表。");
+                System.out.println("您输入的表位置" + Test.sheetNum + "非法，【" + fileName + "】文件共有"
+                        + book.getNumberOfSheets() + "张表。");
                 Test.isSuccess = false;
                 return null;
             }
@@ -74,7 +82,7 @@ public class ExcelUtil {
         return null;
     }
 
-    private static SXSSFWorkbook createMainBook(Path path, int sheetIndex, String fileName) throws IOException {
+    private static SXSSFWorkbook createMainBook(Path path, int sheetIndex, String fileName) {
         Workbook book = createBook(path, fileName);
         if (book == null) return null;
         SXSSFWorkbook mainBook = new SXSSFWorkbook((XSSFWorkbook) book);
@@ -89,10 +97,19 @@ public class ExcelUtil {
             }
         }
 
-        for (int j = 0; j <= sheet.getLastRowNum(); j++) {
+        for (int j = Test.titleRowNum; j <= sheet.getLastRowNum(); j++) {
             Row row = sheet.getRow(j);
-            if (row != null && row.getCell(0) == null) {
-                sheet.removeRow(row); //删除行后，sheet.getLastRowNum()的值不会变
+            if (row != null) {
+                if (row.getCell(0) == null) {
+                    sheet.removeRow(row); //删除行后，sheet.getLastRowNum()的值不会变
+                }
+//                else {
+//                    for (short k = 0; k <= row.getLastCellNum(); k++) {
+//                        Cell cell = row.getCell(k);
+//                        cellValArr[k] = getCellVal(cell);
+//                    }
+//                    calcVal();
+//                }
             }
         }
 
@@ -101,16 +118,19 @@ public class ExcelUtil {
     }
 
     private static Path createXlsxFile(Path xlsFile) throws Exception {
-        TEMP_DIR = Files.createTempDirectory("ltt_");
-        String xlsxFile = TEMP_DIR + "\\" + xlsFile.getFileName() + "x";
-        String cmd = EXCEL_PATH + "excelcnv.exe -oice \"" + xlsFile + "\" \"" + xlsxFile + "\"";
+        if (excelCnvDir == null) {
+            excelCnvDir = Advapi32Util.registryGetStringValue(
+                    WinReg.HKEY_LOCAL_MACHINE, //HKEY
+                    "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\excel.exe", //Key
+                    "Path"
+            );
+        }
+        tmpDir = Files.createTempDirectory("ltt_");
+        String xlsxFile = tmpDir + "\\" + xlsFile.getFileName() + "x";
+        String cmd = excelCnvDir + "excelcnv.exe -oice \"" + xlsFile + "\" \"" + xlsxFile + "\"";
         Process process = Runtime.getRuntime().exec(cmd);
         process.waitFor();
         return Paths.get(xlsxFile);
-    }
-
-    private static boolean isXls(String fileName) {
-        return "xls".equals(fileName.substring(fileName.lastIndexOf('.') + 1));
     }
 
     public static void mergeExcelFiles(File file, List<Path> excelPaths) throws Exception {
@@ -120,8 +140,16 @@ public class ExcelUtil {
             return;
         }
 
-        SXSSFWorkbook mainBook = null;
-        SXSSFSheet mainSheet = null;
+        if (Test.isCard) {
+            Path templatePath = Paths.get(Test.WORK_DIR + "模板/模板.xlsx");
+            try (InputStream in = Files.newInputStream(templatePath)) { //用完流后要关闭，否则后面无法删除临时文件夹
+                XSSFWorkbook book = new XSSFWorkbook(in);
+                mainBook = new SXSSFWorkbook(book);
+                mainSheet = mainBook.getSheetAt(2);
+                mainSheetLastRowNum = 3;
+            }
+        }
+
         int sheetIndex = Test.sheetNum - 1;
 
         try {
@@ -147,11 +175,11 @@ public class ExcelUtil {
             for (int i = 0; i < excelPaths.size(); i++) {
                 Path path = excelPaths.get(i);
                 String fileName = path.getFileName().toString();
-                if (isXls(fileName)) {
+                if (fileName.endsWith("xls")) {
                     path = createXlsxFile(path);
                 }
 
-                if (i == 0) {
+                if (!Test.isCard && i == 0) {
                     mainBook = createMainBook(path, sheetIndex, fileName);
                     if (mainBook == null) return;
                     mainSheet = mainBook.getSheetAt(0);
@@ -173,6 +201,8 @@ public class ExcelUtil {
 //            copySheets(book, sheet, b.getSheetAt(2));
 //        }
 
+            fillSumSheet();
+
             writeFile(mainBook, file);
         } catch (Exception e) {
             Test.isSuccess = false;
@@ -183,10 +213,12 @@ public class ExcelUtil {
     }
 
     private static void deleteTempDir() throws IOException {
-        Files.walk(TEMP_DIR)
-                .map(Path::toFile)
-                .sorted(Comparator.reverseOrder())
-                .forEach(File::delete);
+        if (tmpDir != null) {
+            Files.walk(tmpDir)
+                    .map(Path::toFile)
+                    .sorted(Comparator.reverseOrder())
+                    .forEach(File::delete);
+        }
     }
 
     private static void writeFile(Workbook book, File file) throws Exception {
@@ -208,7 +240,7 @@ public class ExcelUtil {
             newSheetLastRowNum = newSheet.getLastRowNum();
         }
         int newRowNum = newSheetLastRowNum + 1 - Test.titleRowNum;
-        int maxColumnNum = 0;
+        short maxColumnNum = 0;
         Map<Integer, CellStyle> styleMap = copyStyle ? new HashMap<>() : null;
 //        Set<CellRangeAddress> mergedRegions = new HashSet<>();
 //        for (int i = sheet.getFirstRowNum(); i <= sheet.getLastRowNum(); i++) {
@@ -236,22 +268,22 @@ public class ExcelUtil {
                 maxColumnNum = srcRow.getLastCellNum();
             }
         }
-        for (int i = 0; i <= maxColumnNum; i++) {
+        for (short i = 0; i <= maxColumnNum; i++) {
             newSheet.setColumnWidth(i, sheet.getColumnWidth(i));
         }
     }
 
-    private static void copyRow(Workbook newWorkbook, Row srcRow, Row destRow, Map<Integer, CellStyle> styleMap, Set<CellRangeAddress> mergedRegions) {
+    private static void copyRow(Workbook newWorkbook, Row srcRow, Row destRow, Map<Integer, CellStyle> styleMap,
+                                Set<CellRangeAddress> mergedRegions) {
         destRow.setHeight(srcRow.getHeight());
-        for (int j = srcRow.getFirstCellNum(); j <= srcRow.getLastCellNum(); j++) {
+        for (short j = srcRow.getFirstCellNum(); j <= srcRow.getLastCellNum(); j++) {
             Cell oldCell = srcRow.getCell(j);
             Cell newCell = destRow.getCell(j);
             if (oldCell != null) {
                 if (newCell == null) {
                     newCell = destRow.createCell(j);
                 }
-                copyCell(newWorkbook, oldCell, newCell, styleMap);
-
+                cellValArr[j] = copyCell(newWorkbook, oldCell, newCell, styleMap);
 //                CellRangeAddress mergedRegion = getMergedRegion(srcRow.getSheet(), srcRow.getRowNum(),
 //                        (short) oldCell.getColumnIndex());
 //
@@ -270,9 +302,103 @@ public class ExcelUtil {
 //                }
             }
         }
+        calcVal();
     }
 
-    private static void copyCell(Workbook newWorkbook, Cell oldCell, Cell newCell, Map<Integer, CellStyle> styleMap) {
+    private static void calcVal() {
+        String val;
+
+        //资产类别：输电线路,变电设备,配电线路,配电设备-其他,配电设备-电动汽车充换电设备,用电计量设备,通信线路及设备,
+        // 自动化控制设备、信息设备及仪器仪表,发电及供热设备,水工机械设备,制造及检修维护设备,生产管理用工器具,运输设备,辅助生产用设备及器具,
+        // 房屋,建筑物,土地
+        val = cellValArr[1];
+        boolean eq输电线路 = "输电线路".equals(val);
+        boolean eq变电设备 = "变电设备".equals(val);
+        boolean eq配电线路 = "配电线路".equals(val);
+        boolean eq配电设备其他 = "配电设备-其他".equals(val);
+        boolean eq配电设备电动汽车充换电设备 = "配电设备-电动汽车充换电设备".equals(val);
+        boolean eq用电计量设备 = "用电计量设备".equals(val);
+        boolean eq通信线路及设备 = "通信线路及设备".equals(cellValArr[1]);
+        boolean eq自动化控制设备信息设备及仪器仪表 = "自动化控制设备、信息设备及仪器仪表".equals(val);
+        boolean eq发电及供热设备 = "发电及供热设备".equals(val);
+        boolean eq水工机械设备 = "水工机械设备".equals(val);
+        boolean eq制造及检修维护设备 = "制造及检修维护设备".equals(val);
+        boolean eq生产管理用工器具 = "生产管理用工器具".equals(val);
+        boolean eq运输设备 = "运输设备".equals(val);
+        boolean eq辅助生产用设备及器具 = "辅助生产用设备及器具".equals(val);
+        boolean eq房屋 = "房屋".equals(val);
+        boolean eq建筑物 = "建筑物".equals(val);
+        boolean eq土地 = "土地".equals(val);
+
+        //电压等级：500kV,220kV,110kV,35kV,10kV,10kV以下
+        val = cellValArr[3];
+        boolean eq500kV = "500kV".equals(val);
+        boolean eq220kV = "220kV".equals(val);
+        boolean eq110kV = "110kV".equals(val);
+        boolean eq35kV = "35kV".equals(val);
+        boolean eq10kV = "10kV".equals(val);
+        boolean eq10kV以下 = "10kV以下".equals(val);
+
+        //资本化日期（2014-12-31，poi获取到的值是42004.0）
+        boolean le20141231 = "42004.0".compareTo(cellValArr[4]) >= 0;
+
+        String gVal = cellValArr[6];
+        if (eq输电线路) {
+            if (eq500kV) {
+                if (le20141231) {
+                    Sum.c6 = sum(Sum.c6, gVal);
+                } else {
+                    Sum.d6 = sum(Sum.d6, gVal);
+                }
+            } else if (eq220kV) {
+                if (le20141231) {
+                    Sum.c7 = sum(Sum.c7, gVal);
+                } else {
+                    Sum.d7 = sum(Sum.d7, gVal);
+                }
+            } else if (eq110kV) {
+                if (le20141231) {
+                    Sum.c8 = sum(Sum.c8, gVal);
+                } else {
+                    Sum.d8 = sum(Sum.d8, gVal);
+                }
+            } else if (eq35kV) {
+                if (le20141231) {
+                    Sum.c9 = sum(Sum.c9, gVal);
+                } else {
+                    Sum.d9 = sum(Sum.d9, gVal);
+                }
+            }
+
+        }
+    }
+
+    private static void fillSumSheet() {
+        Workbook workbook = mainBook.getXSSFWorkbook(); //直接用SXSSFWorkbook不能获取到值
+
+        Sheet sumSheet2 = workbook.getSheetAt(1);
+        Row row = sumSheet2.getRow(5);
+        row.getCell(2).setCellValue(Sum.c6.doubleValue());
+        row.getCell(3).setCellValue(Sum.d6.doubleValue());
+
+        row = sumSheet2.getRow(6);
+        row.getCell(2).setCellValue(Sum.c7.doubleValue());
+        row.getCell(3).setCellValue(Sum.d7.doubleValue());
+
+        row = sumSheet2.getRow(7);
+        row.getCell(2).setCellValue(Sum.c8.doubleValue());
+        row.getCell(3).setCellValue(Sum.d8.doubleValue());
+
+        row = sumSheet2.getRow(8);
+        row.getCell(2).setCellValue(Sum.c9.doubleValue());
+        row.getCell(3).setCellValue(Sum.d9.doubleValue());
+    }
+
+    private static BigDecimal sum(BigDecimal oldVal, String strVal) {
+        return oldVal.add(new BigDecimal(strVal));
+    }
+
+    private static String copyCell(Workbook newWorkbook, Cell oldCell, Cell newCell, Map<Integer, CellStyle> styleMap) {
         if (styleMap != null) {
             int stHashCode = oldCell.getCellStyle().hashCode();
             CellStyle newCellStyle = styleMap.get(stHashCode);
@@ -284,6 +410,7 @@ public class ExcelUtil {
             newCell.setCellStyle(newCellStyle);
         }
 
+        String strVal = null;
 
         CellType oldCellType = oldCell.getCellType();
         if (oldCellType == CellType.FORMULA) {
@@ -292,10 +419,14 @@ public class ExcelUtil {
         }
         switch (oldCellType) {
             case STRING:
-                newCell.setCellValue(oldCell.getRichStringCellValue());
+                RichTextString richStringVal = oldCell.getRichStringCellValue();
+                newCell.setCellValue(richStringVal);
+                strVal = richStringVal.getString();
                 break;
             case NUMERIC:
-                newCell.setCellValue(oldCell.getNumericCellValue());
+                double doubleVal = oldCell.getNumericCellValue();
+                newCell.setCellValue(doubleVal);
+                strVal = Double.toString(doubleVal);
                 break;
             case BLANK:
                 newCell.setBlank();
@@ -312,6 +443,19 @@ public class ExcelUtil {
             default:
                 break;
         }
+
+        return strVal;
+    }
+
+    private static String getCellVal(Cell cell) {
+        if (cell == null) return "0";
+        switch (cell.getCellType()) {
+            case STRING:
+                return cell.getRichStringCellValue().getString();
+            case NUMERIC:
+                return Double.toString(cell.getNumericCellValue());
+        }
+        return "0";
     }
 
 //    private static boolean hasEffectiveValue(Row row, int cellNum) {
