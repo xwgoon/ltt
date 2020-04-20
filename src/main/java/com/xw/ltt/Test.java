@@ -1,7 +1,6 @@
 package com.xw.ltt;
 
 import com.xw.ltt.excel.ExcelUtil;
-import com.xw.ltt.vo.Sum;
 
 import java.io.File;
 import java.io.IOException;
@@ -121,8 +120,6 @@ public class Test {
         } else {
             System.out.println("合并失败。\n");
         }
-
-        System.out.println(new Sum());
 
         System.out.println("请按回车键结束...");
         System.in.read();

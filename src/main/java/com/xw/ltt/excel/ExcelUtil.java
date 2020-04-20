@@ -3,7 +3,6 @@ package com.xw.ltt.excel;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.WinReg;
 import com.xw.ltt.Test;
-import com.xw.ltt.vo.Sum;
 import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -19,8 +18,6 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 public class ExcelUtil {
@@ -58,12 +55,47 @@ public class ExcelUtil {
 //        System.out.println(new BigDecimal(Double.toString(d)));
 
 
-        System.out.println(ChronoUnit.DAYS.between(LocalDate.of(2003, 4, 1), LocalDate.of(1900, 1, 1)));
+//        System.out.println(ChronoUnit.DAYS.between(LocalDate.of(2003, 4, 1), LocalDate.of(1900, 1, 1)));
+
+        System.out.println((int) 'B');
     }
 
     private static boolean isFirstExcel = true;
     private static int mainSheetLastRowNum;
     private static String[] cellValArr = new String[30];
+    private static final Map<String, BigDecimal> valMap = new HashMap<>();
+
+    //资产类别：输电线路,变电设备,配电线路,配电设备-其他,配电设备-电动汽车充换电设备,用电计量设备,通信线路及设备,
+    // 自动化控制设备、信息设备及仪器仪表,发电及供热设备,水工机械设备,制造及检修维护设备,生产管理用工器具,运输设备,辅助生产用设备及器具,
+    // 房屋,建筑物,土地
+    private static boolean eq输电线路;
+    private static boolean eq变电设备;
+    private static boolean eq配电线路;
+    private static boolean eq配电设备其他;
+    private static boolean eq配电设备电动汽车充换电设备;
+    private static boolean eq用电计量设备;
+    private static boolean eq通信线路及设备;
+    private static boolean eq自动化控制设备信息设备及仪器仪表;
+    private static boolean eq发电及供热设备;
+    private static boolean eq水工机械设备;
+    private static boolean eq制造及检修维护设备;
+    private static boolean eq生产管理用工器具;
+    private static boolean eq运输设备;
+    private static boolean eq辅助生产用设备及器具;
+    private static boolean eq房屋;
+    private static boolean eq建筑物;
+    private static boolean eq土地;
+
+    //电压等级：500kV,220kV,110kV,35kV,10kV,10kV以下
+    private static boolean eq500KV;
+    private static boolean eq220KV;
+    private static boolean eq110KV;
+    private static boolean eq35KV;
+    private static boolean eq10KV;
+    private static boolean eq10KV以下;
+
+    //资本化日期
+    private static boolean le20141231;
 
     private static Workbook createBook(Path path, String fileName) {
         System.out.println("正在合并【" + fileName + "】...");
@@ -201,7 +233,8 @@ public class ExcelUtil {
 //            copySheets(book, sheet, b.getSheetAt(2));
 //        }
 
-            fillSumSheet();
+            completeMapVal();
+            fillSheet2();
 
             writeFile(mainBook, file);
         } catch (Exception e) {
@@ -276,6 +309,7 @@ public class ExcelUtil {
     private static void copyRow(Workbook newWorkbook, Row srcRow, Row destRow, Map<Integer, CellStyle> styleMap,
                                 Set<CellRangeAddress> mergedRegions) {
         destRow.setHeight(srcRow.getHeight());
+        Arrays.fill(cellValArr, null);
         for (short j = srcRow.getFirstCellNum(); j <= srcRow.getLastCellNum(); j++) {
             Cell oldCell = srcRow.getCell(j);
             Cell newCell = destRow.getCell(j);
@@ -306,96 +340,389 @@ public class ExcelUtil {
     }
 
     private static void calcVal() {
-        String val;
 
-        //资产类别：输电线路,变电设备,配电线路,配电设备-其他,配电设备-电动汽车充换电设备,用电计量设备,通信线路及设备,
-        // 自动化控制设备、信息设备及仪器仪表,发电及供热设备,水工机械设备,制造及检修维护设备,生产管理用工器具,运输设备,辅助生产用设备及器具,
-        // 房屋,建筑物,土地
-        val = cellValArr[1];
-        boolean eq输电线路 = "输电线路".equals(val);
-        boolean eq变电设备 = "变电设备".equals(val);
-        boolean eq配电线路 = "配电线路".equals(val);
-        boolean eq配电设备其他 = "配电设备-其他".equals(val);
-        boolean eq配电设备电动汽车充换电设备 = "配电设备-电动汽车充换电设备".equals(val);
-        boolean eq用电计量设备 = "用电计量设备".equals(val);
-        boolean eq通信线路及设备 = "通信线路及设备".equals(cellValArr[1]);
-        boolean eq自动化控制设备信息设备及仪器仪表 = "自动化控制设备、信息设备及仪器仪表".equals(val);
-        boolean eq发电及供热设备 = "发电及供热设备".equals(val);
-        boolean eq水工机械设备 = "水工机械设备".equals(val);
-        boolean eq制造及检修维护设备 = "制造及检修维护设备".equals(val);
-        boolean eq生产管理用工器具 = "生产管理用工器具".equals(val);
-        boolean eq运输设备 = "运输设备".equals(val);
-        boolean eq辅助生产用设备及器具 = "辅助生产用设备及器具".equals(val);
-        boolean eq房屋 = "房屋".equals(val);
-        boolean eq建筑物 = "建筑物".equals(val);
-        boolean eq土地 = "土地".equals(val);
+        //资产类别
+        eq输电线路 = false;
+        eq变电设备 = false;
+        eq配电线路 = false;
+        eq配电设备其他 = false;
+        eq配电设备电动汽车充换电设备 = false;
+        eq用电计量设备 = false;
+        eq通信线路及设备 = false;
+        eq自动化控制设备信息设备及仪器仪表 = false;
+        eq发电及供热设备 = false;
+        eq水工机械设备 = false;
+        eq制造及检修维护设备 = false;
+        eq生产管理用工器具 = false;
+        eq运输设备 = false;
+        eq辅助生产用设备及器具 = false;
+        eq房屋 = false;
+        eq建筑物 = false;
+        eq土地 = false;
 
-        //电压等级：500kV,220kV,110kV,35kV,10kV,10kV以下
-        val = cellValArr[3];
-        boolean eq500kV = "500kV".equals(val);
-        boolean eq220kV = "220kV".equals(val);
-        boolean eq110kV = "110kV".equals(val);
-        boolean eq35kV = "35kV".equals(val);
-        boolean eq10kV = "10kV".equals(val);
-        boolean eq10kV以下 = "10kV以下".equals(val);
+        switch (cellValArr[1]) {
+            case "输电线路":
+                eq输电线路 = true;
+                break;
+            case "变电设备":
+                eq变电设备 = true;
+                break;
+            case "配电线路":
+                eq配电线路 = true;
+                break;
+            case "配电设备-其他":
+                eq配电设备其他 = true;
+                break;
+            case "配电设备-电动汽车充换电设备":
+                eq配电设备电动汽车充换电设备 = true;
+                break;
+            case "用电计量设备":
+                eq用电计量设备 = true;
+                break;
+            case "通信线路及设备":
+                eq通信线路及设备 = true;
+                break;
+            case "自动化控制设备、信息设备及仪器仪表":
+                eq自动化控制设备信息设备及仪器仪表 = true;
+                break;
+            case "发电及供热设备":
+                eq发电及供热设备 = true;
+                break;
+            case "水工机械设备":
+                eq水工机械设备 = true;
+                break;
+            case "制造及检修维护设备":
+                eq制造及检修维护设备 = true;
+                break;
+            case "生产管理用工器具":
+                eq生产管理用工器具 = true;
+                break;
+            case "辅助生产用设备及器具":
+                eq辅助生产用设备及器具 = true;
+                break;
+            case "房屋":
+                eq房屋 = true;
+                break;
+            case "建筑物":
+                eq建筑物 = true;
+                break;
+            case "土地":
+                eq土地 = true;
+                break;
+        }
+
+
+        //电压等级
+        eq500KV = false;
+        eq220KV = false;
+        eq110KV = false;
+        eq35KV = false;
+        eq10KV = false;
+        eq10KV以下 = false;
+
+        switch (cellValArr[3].toUpperCase()) {
+            case "500KV":
+                eq500KV = true;
+                break;
+            case "220KV":
+                eq220KV = true;
+                break;
+            case "110KV":
+                eq110KV = true;
+                break;
+            case "35KV":
+                eq35KV = true;
+                break;
+            case "10KV":
+                eq10KV = true;
+                break;
+            case "10KV以下":
+                eq10KV以下 = true;
+                break;
+        }
 
         //资本化日期（2014-12-31，poi获取到的值是42004.0）
-        boolean le20141231 = "42004.0".compareTo(cellValArr[4]) >= 0;
+        le20141231 = "42004.0".compareTo(cellValArr[4]) >= 0;
 
-        String gVal = cellValArr[6];
+        calcCol("C", "D", cellValArr[6]);
+        calcCol("F", "G", cellValArr[9]);
+        calcCol("I", "J", cellValArr[8]);
+        calcCol("L", "M", cellValArr[11]);
+        calcCol("O", "P", cellValArr[12]);
+
+    }
+
+    private static void calcCol(String le20141231Col, String gt20141231Col, String val) {
+        String col = le20141231 ? le20141231Col : gt20141231Col;
+        String aVal = cellValArr[0];
         if (eq输电线路) {
-            if (eq500kV) {
-                if (le20141231) {
-                    Sum.c6 = sum(Sum.c6, gVal);
-                } else {
-                    Sum.d6 = sum(Sum.d6, gVal);
-                }
-            } else if (eq220kV) {
-                if (le20141231) {
-                    Sum.c7 = sum(Sum.c7, gVal);
-                } else {
-                    Sum.d7 = sum(Sum.d7, gVal);
-                }
-            } else if (eq110kV) {
-                if (le20141231) {
-                    Sum.c8 = sum(Sum.c8, gVal);
-                } else {
-                    Sum.d8 = sum(Sum.d8, gVal);
-                }
-            } else if (eq35kV) {
-                if (le20141231) {
-                    Sum.c9 = sum(Sum.c9, gVal);
-                } else {
-                    Sum.d9 = sum(Sum.d9, gVal);
-                }
+            if (eq500KV) {
+                calcMap(col, 6, val);
+            } else if (eq220KV) {
+                calcMap(col, 7, val);
+            } else if (eq110KV) {
+                calcMap(col, 8, val);
+            } else if (eq35KV) {
+                calcMap(col, 9, val);
             }
-
+        } else if (eq变电设备) {
+            if (eq500KV) {
+                calcMap(col, 11, val);
+            } else if (eq220KV) {
+                calcMap(col, 12, val);
+            } else if (eq110KV) {
+                calcMap(col, 13, val);
+            } else if (eq35KV) {
+                calcMap(col, 14, val);
+            } else if (eq10KV) {
+                calcMap(col, 15, val);
+            }
+        } else if (eq配电线路) {
+            if (eq35KV) {
+                calcMap(col, 18, val);
+            } else if (eq10KV) {
+                calcMap(col, 19, val);
+            } else if (eq10KV以下) {
+                calcMap(col, 20, val);
+            }
+        } else if (eq配电设备其他) {
+            if (eq35KV) {
+                calcMap(col, 22, val);
+            } else if (eq10KV) {
+                calcMap(col, 23, val);
+            } else if (eq10KV以下) {
+                calcMap(col, 24, val);
+            }
+        } else if (eq配电设备电动汽车充换电设备) {
+            calcMap(col, 25, val);
+        } else if (eq用电计量设备) {
+            calcMap(col, 26, val);
+        } else if (eq通信线路及设备) {
+            calcMap(col, 27, val);
+        } else if (eq自动化控制设备信息设备及仪器仪表) {
+            if (aVal.startsWith("2001")) {
+                calcMap(col, 29, val);
+            } else if (aVal.startsWith("2004")) {
+                calcMap(col, 30, val);
+            } else if (aVal.startsWith("2099")) {
+                calcMap(col, 31, val);
+            } else if (aVal.startsWith("2003")) {
+                calcMap(col, 32, val);
+            } else if (aVal.startsWith("2002")) {
+                calcMap(col, 33, val);
+            }
+        } else if (eq发电及供热设备) {
+            if (aVal.startsWith("2101")) {
+                calcMap(col, 35, val);
+            } else if (aVal.startsWith("2102")) {
+                calcMap(col, 36, val);
+            } else if (aVal.startsWith("2103")) {
+                calcMap(col, 37, val);
+            } else if (aVal.startsWith("2104")) {
+                calcMap(col, 38, val);
+            } else if (aVal.startsWith("2105")) {
+                calcMap(col, 39, val);
+            } else if (aVal.startsWith("2113")) {
+                calcMap(col, 40, val);
+            } else if (aVal.startsWith("2106")) {
+                calcMap(col, 41, val);
+            } else if (aVal.startsWith("2107")) {
+                calcMap(col, 42, val);
+            } else if (aVal.startsWith("2108")) {
+                calcMap(col, 43, val);
+            } else if (aVal.startsWith("2109")) {
+                calcMap(col, 44, val);
+            } else if (aVal.startsWith("2110")) {
+                calcMap(col, 45, val);
+            } else if (aVal.startsWith("2111")) {
+                calcMap(col, 46, val);
+            } else if (aVal.startsWith("2112")) {
+                calcMap(col, 47, val);
+            } else if (aVal.startsWith("2199")) {
+                calcMap(col, 48, val);
+            }
+        } else if (eq水工机械设备) {
+            calcMap(col, 49, val);
+        } else if (eq制造及检修维护设备) {
+            calcMap(col, 50, val);
+        } else if (eq生产管理用工器具) {
+            calcMap(col, 51, val);
+        } else if (eq运输设备) {
+            if (aVal.startsWith("2501")) {
+                calcMap(col, 53, val);
+            } else if (aVal.startsWith("2502")) {
+                calcMap(col, 54, val);
+            } else if (aVal.startsWith("2503")) {
+                calcMap(col, 55, val);
+            } else if (aVal.startsWith("2504")) {
+                calcMap(col, 56, val);
+            } else if (aVal.startsWith("2599")) {
+                calcMap(col, 57, val);
+            }
+        } else if (eq辅助生产用设备及器具) {
+            calcMap(col, 58, val);
+        } else if (eq房屋) {
+            calcMap(col, 59, val);
+        } else if (eq建筑物) {
+            calcMap(col, 60, val);
+        } else if (eq土地) {
+            calcMap(col, 61, val);
         }
     }
 
-    private static void fillSumSheet() {
-        Workbook workbook = mainBook.getXSSFWorkbook(); //直接用SXSSFWorkbook不能获取到值
+    private static boolean isBlank(String str) {
+        int strLen;
+        if (str != null && (strLen = str.length()) != 0) {
+            for (int i = 0; i < strLen; ++i) {
+                if (!Character.isWhitespace(str.charAt(i))) {
+                    return false;
+                }
+            }
 
-        Sheet sumSheet2 = workbook.getSheetAt(1);
-        Row row = sumSheet2.getRow(5);
-        row.getCell(2).setCellValue(Sum.c6.doubleValue());
-        row.getCell(3).setCellValue(Sum.d6.doubleValue());
-
-        row = sumSheet2.getRow(6);
-        row.getCell(2).setCellValue(Sum.c7.doubleValue());
-        row.getCell(3).setCellValue(Sum.d7.doubleValue());
-
-        row = sumSheet2.getRow(7);
-        row.getCell(2).setCellValue(Sum.c8.doubleValue());
-        row.getCell(3).setCellValue(Sum.d8.doubleValue());
-
-        row = sumSheet2.getRow(8);
-        row.getCell(2).setCellValue(Sum.c9.doubleValue());
-        row.getCell(3).setCellValue(Sum.d9.doubleValue());
+            return true;
+        } else {
+            return true;
+        }
     }
 
-    private static BigDecimal sum(BigDecimal oldVal, String strVal) {
-        return oldVal.add(new BigDecimal(strVal));
+    private static void calcMap(String col, int row, String val) {
+        BigDecimal decimalVal = isBlank(val) ? BigDecimal.ZERO : new BigDecimal(val);
+        valMap.merge(col + row, decimalVal, BigDecimal::add);
+    }
+
+    private static void calcMap(String col, int row, BigDecimal val) {
+        valMap.merge(col + row, val, BigDecimal::add);
+    }
+
+    private static void subColVal(String resultCol, String col1, String col2, int row) {
+        BigDecimal col1Val = valMap.getOrDefault(col1 + row, BigDecimal.ZERO);
+        BigDecimal col2Val = valMap.getOrDefault(col2 + row, BigDecimal.ZERO);
+        BigDecimal resultVal = col1Val.subtract(col2Val);
+        calcMap(resultCol, row, resultVal);
+    }
+
+    private static void completeMapVal() {
+
+        //三、配电线路及设备 - 2.配电设备 - 10千伏以下，需要加上 配电设备-电动汽车充换电设备 项
+        String[] cols = {"C", "D", "F", "G", "I", "J", "L", "M", "O", "P"};
+        for (String col : cols) {
+            sumColVal(col, 24, 24, 25);
+        }
+
+        //年初净值、年末净值
+        for (int i = 6; i <= 61; i++) {
+            subColVal("R", "C", "I", i);
+            subColVal("S", "D", "J", i);
+            subColVal("U", "F", "L", i);
+            subColVal("V", "G", "M", i);
+        }
+
+        cols = new String[]{"C", "D", "F", "G", "I", "J", "L", "M", "O", "P", "R", "S", "U", "V"};
+        int[][] rowStartEndArr = {
+                {5, 9}, //一、输电线路
+                {10, 15}, //二、变电设备
+                {17, 20}, //1.配电线路
+                {21, 24}, //2.配电设备
+                {28, 33}, //六、自动化控制设备、信息设备及仪器仪表
+                {34, 48}, //七、发电及供热设备
+                {52, 57}, //十一、运输设备
+        };
+
+        for (int[] startEnd : rowStartEndArr) {
+            for (String col : cols) {
+                sumColVal(col, startEnd[0], startEnd[1]);
+            }
+        }
+
+        //三、配电线路及设备
+        int[] heJiRows = {17, 21};
+        for (String col : cols) {
+            sumColVal(col, 16, heJiRows);
+        }
+
+        //合计
+        heJiRows = new int[]{5, 10, 16, 26, 27, 28, 34, 49, 50, 51, 52, 58, 59, 60, 61};
+        for (String col : cols) {
+            sumColVal(col, 62, heJiRows);
+        }
+
+        //专用设备合计
+        heJiRows = new int[]{5, 10, 16, 30, 31, 32, 37, 38, 39, 40, 41, 42, 43, 45, 46, 47, 48, 49, 53, 54, 56};
+        for (String col : cols) {
+            sumColVal(col, 63, heJiRows);
+        }
+
+        //通用设备合计
+        heJiRows = new int[]{26, 27, 29, 33, 35, 36, 44, 50, 51, 55, 57, 58};
+        for (String col : cols) {
+            sumColVal(col, 64, heJiRows);
+        }
+
+        //通用设备合计
+        heJiRows = new int[]{59, 60, 61};
+        for (String col : cols) {
+            sumColVal(col, 65, heJiRows);
+        }
+
+        //计算列合计值
+        for (int i = 5; i <= 65; i++) {
+            for (char c = 'B'; c <= 'T'; c += 3) {
+                sumRowVal(i, c, c + 2);
+            }
+        }
+    }
+
+    private static void fillSheet2() {
+        Workbook workbook = mainBook.getXSSFWorkbook(); //直接用SXSSFWorkbook不能获取到值
+        Sheet sheet2 = workbook.getSheetAt(1);
+
+        Row row;
+        Cell cell;
+        String position;
+        for (int i = 5; i <= 65; i++) {
+            row = sheet2.getRow(i - 1);
+            for (int j = 1; j <= 21; j++) {
+                position = (char) ('A' + j) + String.valueOf(i);
+                BigDecimal bigDecimalVal = valMap.get(position);
+                double doubleVal = bigDecimalVal == null ? 0 : bigDecimalVal.doubleValue();
+                cell = row.getCell(j);
+                cell.setCellValue(doubleVal);
+            }
+        }
+    }
+
+    private static void sumColVal(String col, int rowStart, int rowEnd) {
+        BigDecimal sumVal = BigDecimal.ZERO;
+        for (int i = rowStart + 1; i <= rowEnd; i++) {
+            BigDecimal val = valMap.get(col + i);
+            if (val != null) {
+                sumVal = sumVal.add(val);
+            }
+        }
+        valMap.put(col + rowStart, sumVal);
+    }
+
+    private static void sumColVal(String col, int resultRow, int... sumRows) {
+        BigDecimal sumVal = BigDecimal.ZERO;
+        for (int row : sumRows) {
+            BigDecimal val = valMap.get(col + row);
+            if (val != null) {
+                sumVal = sumVal.add(val);
+            }
+        }
+        valMap.put(col + resultRow, sumVal);
+    }
+
+    private static void sumRowVal(int row, int colStart, int colEnd) {
+        String rowStr = String.valueOf(row);
+        BigDecimal sumVal = BigDecimal.ZERO;
+        for (int i = colStart + 1; i <= colEnd; i++) {
+            BigDecimal val = valMap.get((char) i + rowStr);
+            if (val != null) {
+                sumVal = sumVal.add(val);
+            }
+        }
+        valMap.put((char) colStart + rowStr, sumVal);
     }
 
     private static String copyCell(Workbook newWorkbook, Cell oldCell, Cell newCell, Map<Integer, CellStyle> styleMap) {
