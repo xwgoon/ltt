@@ -64,6 +64,7 @@ public class ExcelUtil {
     private static int mainSheetLastRowNum;
     private static String[] cellValArr = new String[30];
     private static final Map<String, BigDecimal> valMap = new HashMap<>();
+    private static final Map<String, BigDecimal> s1ValMap = new HashMap<>();
 
     //资产类别：输电线路,变电设备,配电线路,配电设备-其他,配电设备-电动汽车充换电设备,用电计量设备,通信线路及设备,
     // 自动化控制设备、信息设备及仪器仪表,发电及供热设备,水工机械设备,制造及检修维护设备,生产管理用工器具,运输设备,辅助生产用设备及器具,
@@ -444,12 +445,165 @@ public class ExcelUtil {
         //资本化日期（2014-12-31，poi获取到的值是42004.0）
         le20141231 = "42004.0".compareTo(cellValArr[4]) >= 0;
 
+        //------汇总表2------
         calcCol("C", "D", cellValArr[6]);
         calcCol("F", "G", cellValArr[9]);
         calcCol("I", "J", cellValArr[8]);
         calcCol("L", "M", cellValArr[11]);
         calcCol("O", "P", cellValArr[12]);
 
+        //------汇总表1------
+        //年初-其中：已提足折旧资产原值
+        calcS1Col("C", cellValArr[7]);
+
+        //本年增加
+        String col1 = null; //资产原值
+        String col2 = null; //累计折旧
+        switch (cellValArr[13]) { //资产变动类型
+            case "工程项目":
+            case "零购项目":
+            case "用户资产":
+            case "盘盈资产":
+            case "非货币性交易":
+            case "捐赠增加":
+                col1 = "E";
+                col2 = "X";
+                break;
+            case "子分公司间划转资产":
+                col1 = "F";
+                col2 = "Z";
+                break;
+            case "省外划拨":
+                col1 = "G";
+                col2 = "AA";
+                break;
+            case "省内地市间划拨":
+                col1 = "H";
+                col2 = "AB";
+                break;
+            case "拆分合并重分类":
+            case "地市内划拨":
+                col1 = "I";
+                col2 = "AC";
+                break;
+        }
+        calcS1Col(col1, cellValArr[14]);
+        calcS1Col(col2, cellValArr[15]);
+
+        //本年减少
+        col1 = null; //资产原值
+        col2 = null; //累计折旧
+        switch (cellValArr[16]) { //资产变动类型
+            case "报废":
+                col1 = "K";
+                col2 = "AE";
+                break;
+            case "出售":
+                col1 = "L";
+                col2 = "AF";
+                break;
+            case "三供一业无偿划出":
+                col1 = "M";
+                col2 = "AG";
+                break;
+            case "子分公司间划转资产":
+                col1 = "N";
+                col2 = "AH";
+                break;
+            case "省外划拨":
+                col1 = "O";
+                col2 = "AI";
+                break;
+            case "省内地市间划拨":
+                col1 = "P";
+                col2 = "AJ";
+                break;
+            case "拆分合并重分类":
+            case "地市内划拨":
+                col1 = "Q";
+                col2 = "AK";
+                break;
+        }
+        calcS1Col(col1, cellValArr[17]);
+        calcS1Col(col2, cellValArr[18]);
+
+        //年末-其中：已提足折旧资产原值
+        calcS1Col("S", cellValArr[10]);
+
+        //逾龄资产预计	-预计2020年末逾龄资产
+        calcS1Col("AO", cellValArr[22]);
+
+        //逾龄资产预计	-预计2021年末逾龄资产
+        calcS1Col("AP", cellValArr[23]);
+
+    }
+
+    private static void calcS1Col(String col, String val) {
+        if (eq输电线路) {
+            if (eq500KV) {
+                calcS1Map(col, 6, val);
+            } else if (eq220KV) {
+                calcS1Map(col, 7, val);
+            } else if (eq110KV) {
+                calcS1Map(col, 8, val);
+            } else if (eq35KV) {
+                calcS1Map(col, 9, val);
+            }
+        } else if (eq变电设备) {
+            if (eq500KV) {
+                calcS1Map(col, 11, val);
+            } else if (eq220KV) {
+                calcS1Map(col, 12, val);
+            } else if (eq110KV) {
+                calcS1Map(col, 13, val);
+            } else if (eq35KV) {
+                calcS1Map(col, 14, val);
+            } else if (eq10KV) {
+                calcS1Map(col, 15, val);
+            }
+        } else if (eq配电线路) {
+            if (eq35KV) {
+                calcS1Map(col, 17, val);
+            } else if (eq10KV) {
+                calcS1Map(col, 18, val);
+            } else if (eq10KV以下) {
+                calcS1Map(col, 19, val);
+            }
+        } else if (eq配电设备其他) {
+            if (eq35KV) {
+                calcS1Map(col, 21, val);
+            } else if (eq10KV) {
+                calcS1Map(col, 22, val);
+            } else if (eq10KV以下) {
+                calcS1Map(col, 23, val);
+            }
+        } else if (eq配电设备电动汽车充换电设备) {
+            calcS1Map(col, 24, val);
+        } else if (eq用电计量设备) {
+            calcS1Map(col, 25, val);
+        } else if (eq通信线路及设备) {
+            calcS1Map(col, 26, val);
+        } else if (eq自动化控制设备信息设备及仪器仪表) {
+            calcS1Map(col, 27, val);
+        } else if (eq发电及供热设备) {
+            calcS1Map(col, 28, val);
+        } else if (eq水工机械设备) {
+            calcS1Map(col, 29, val);
+        } else if (eq制造及检修维护设备) {
+            calcS1Map(col, 30, val);
+        } else if (eq生产管理用工器具) {
+            calcS1Map(col, 31, val);
+        } else if (eq运输设备) {
+            calcS1Map(col, 32, val);
+        } else if (eq辅助生产用设备及器具) {
+            calcS1Map(col, 33, val);
+        } else if (eq房屋) {
+            calcS1Map(col, 34, val);
+        } else if (eq建筑物) {
+            calcS1Map(col, 35, val);
+        } else if (eq土地) {
+            calcS1Map(col, 36, val);
+        }
     }
 
     private static void calcCol(String le20141231Col, String gt20141231Col, String val) {
@@ -578,16 +732,18 @@ public class ExcelUtil {
                     return false;
                 }
             }
-
-            return true;
-        } else {
-            return true;
         }
+        return true;
     }
 
     private static void calcMap(String col, int row, String val) {
         BigDecimal decimalVal = isBlank(val) ? BigDecimal.ZERO : new BigDecimal(val);
         valMap.merge(col + row, decimalVal, BigDecimal::add);
+    }
+
+    private static void calcS1Map(String col, int row, String val) {
+        BigDecimal decimalVal = isBlank(val) ? BigDecimal.ZERO : new BigDecimal(val);
+        s1ValMap.merge(col + row, decimalVal, BigDecimal::add);
     }
 
     private static void calcMap(String col, int row, BigDecimal val) {
