@@ -63,7 +63,7 @@ public class ExcelUtil {
     private static boolean isFirstExcel = true;
     private static int mainSheetLastRowNum;
     private static String[] cellValArr = new String[30];
-    private static final Map<String, BigDecimal> valMap = new HashMap<>();
+    private static final Map<String, BigDecimal> s2ValMap = new HashMap<>();
     private static final Map<String, BigDecimal> s1ValMap = new HashMap<>();
 
     //资产类别：输电线路,变电设备,配电线路,配电设备-其他,配电设备-电动汽车充换电设备,用电计量设备,通信线路及设备,
@@ -234,7 +234,7 @@ public class ExcelUtil {
 //            copySheets(book, sheet, b.getSheetAt(2));
 //        }
 
-            completeMapVal();
+            completeS2ValMap();
             fillSheet2();
 
             writeFile(mainBook, file);
@@ -337,10 +337,10 @@ public class ExcelUtil {
 //                }
             }
         }
-        calcVal();
+        calcCell();
     }
 
-    private static void calcVal() {
+    private static void calcCell() {
 
         //资产类别
         eq输电线路 = false;
@@ -360,7 +360,6 @@ public class ExcelUtil {
         eq房屋 = false;
         eq建筑物 = false;
         eq土地 = false;
-
         switch (cellValArr[1]) {
             case "输电线路":
                 eq输电线路 = true;
@@ -412,7 +411,6 @@ public class ExcelUtil {
                 break;
         }
 
-
         //电压等级
         eq500KV = false;
         eq220KV = false;
@@ -420,7 +418,6 @@ public class ExcelUtil {
         eq35KV = false;
         eq10KV = false;
         eq10KV以下 = false;
-
         switch (cellValArr[3].toUpperCase()) {
             case "500KV":
                 eq500KV = true;
@@ -445,14 +442,21 @@ public class ExcelUtil {
         //资本化日期（2014-12-31，poi获取到的值是42004.0）
         le20141231 = "42004.0".compareTo(cellValArr[4]) >= 0;
 
-        //------汇总表2------
-        calcCol("C", "D", cellValArr[6]);
-        calcCol("F", "G", cellValArr[9]);
-        calcCol("I", "J", cellValArr[8]);
-        calcCol("L", "M", cellValArr[11]);
-        calcCol("O", "P", cellValArr[12]);
+        calcS2Cell();
 
-        //------汇总表1------
+        calcS1Cell();
+
+    }
+
+    private static void calcS2Cell() {
+        calcS2Col("C", "D", cellValArr[6]);
+        calcS2Col("F", "G", cellValArr[9]);
+        calcS2Col("I", "J", cellValArr[8]);
+        calcS2Col("L", "M", cellValArr[11]);
+        calcS2Col("O", "P", cellValArr[12]);
+    }
+
+    private static void calcS1Cell() {
         //年初-其中：已提足折旧资产原值
         calcS1Col("C", cellValArr[7]);
 
@@ -535,7 +539,6 @@ public class ExcelUtil {
 
         //逾龄资产预计	-预计2021年末逾龄资产
         calcS1Col("AP", cellValArr[23]);
-
     }
 
     private static void calcS1Col(String col, String val) {
@@ -606,121 +609,121 @@ public class ExcelUtil {
         }
     }
 
-    private static void calcCol(String le20141231Col, String gt20141231Col, String val) {
+    private static void calcS2Col(String le20141231Col, String gt20141231Col, String val) {
         String col = le20141231 ? le20141231Col : gt20141231Col;
         String aVal = cellValArr[0];
         if (eq输电线路) {
             if (eq500KV) {
-                calcMap(col, 6, val);
+                calcS2Map(col, 6, val);
             } else if (eq220KV) {
-                calcMap(col, 7, val);
+                calcS2Map(col, 7, val);
             } else if (eq110KV) {
-                calcMap(col, 8, val);
+                calcS2Map(col, 8, val);
             } else if (eq35KV) {
-                calcMap(col, 9, val);
+                calcS2Map(col, 9, val);
             }
         } else if (eq变电设备) {
             if (eq500KV) {
-                calcMap(col, 11, val);
+                calcS2Map(col, 11, val);
             } else if (eq220KV) {
-                calcMap(col, 12, val);
+                calcS2Map(col, 12, val);
             } else if (eq110KV) {
-                calcMap(col, 13, val);
+                calcS2Map(col, 13, val);
             } else if (eq35KV) {
-                calcMap(col, 14, val);
+                calcS2Map(col, 14, val);
             } else if (eq10KV) {
-                calcMap(col, 15, val);
+                calcS2Map(col, 15, val);
             }
         } else if (eq配电线路) {
             if (eq35KV) {
-                calcMap(col, 18, val);
+                calcS2Map(col, 18, val);
             } else if (eq10KV) {
-                calcMap(col, 19, val);
+                calcS2Map(col, 19, val);
             } else if (eq10KV以下) {
-                calcMap(col, 20, val);
+                calcS2Map(col, 20, val);
             }
         } else if (eq配电设备其他) {
             if (eq35KV) {
-                calcMap(col, 22, val);
+                calcS2Map(col, 22, val);
             } else if (eq10KV) {
-                calcMap(col, 23, val);
+                calcS2Map(col, 23, val);
             } else if (eq10KV以下) {
-                calcMap(col, 24, val);
+                calcS2Map(col, 24, val);
             }
         } else if (eq配电设备电动汽车充换电设备) {
-            calcMap(col, 25, val);
+            calcS2Map(col, 25, val);
         } else if (eq用电计量设备) {
-            calcMap(col, 26, val);
+            calcS2Map(col, 26, val);
         } else if (eq通信线路及设备) {
-            calcMap(col, 27, val);
+            calcS2Map(col, 27, val);
         } else if (eq自动化控制设备信息设备及仪器仪表) {
             if (aVal.startsWith("2001")) {
-                calcMap(col, 29, val);
+                calcS2Map(col, 29, val);
             } else if (aVal.startsWith("2004")) {
-                calcMap(col, 30, val);
+                calcS2Map(col, 30, val);
             } else if (aVal.startsWith("2099")) {
-                calcMap(col, 31, val);
+                calcS2Map(col, 31, val);
             } else if (aVal.startsWith("2003")) {
-                calcMap(col, 32, val);
+                calcS2Map(col, 32, val);
             } else if (aVal.startsWith("2002")) {
-                calcMap(col, 33, val);
+                calcS2Map(col, 33, val);
             }
         } else if (eq发电及供热设备) {
             if (aVal.startsWith("2101")) {
-                calcMap(col, 35, val);
+                calcS2Map(col, 35, val);
             } else if (aVal.startsWith("2102")) {
-                calcMap(col, 36, val);
+                calcS2Map(col, 36, val);
             } else if (aVal.startsWith("2103")) {
-                calcMap(col, 37, val);
+                calcS2Map(col, 37, val);
             } else if (aVal.startsWith("2104")) {
-                calcMap(col, 38, val);
+                calcS2Map(col, 38, val);
             } else if (aVal.startsWith("2105")) {
-                calcMap(col, 39, val);
+                calcS2Map(col, 39, val);
             } else if (aVal.startsWith("2113")) {
-                calcMap(col, 40, val);
+                calcS2Map(col, 40, val);
             } else if (aVal.startsWith("2106")) {
-                calcMap(col, 41, val);
+                calcS2Map(col, 41, val);
             } else if (aVal.startsWith("2107")) {
-                calcMap(col, 42, val);
+                calcS2Map(col, 42, val);
             } else if (aVal.startsWith("2108")) {
-                calcMap(col, 43, val);
+                calcS2Map(col, 43, val);
             } else if (aVal.startsWith("2109")) {
-                calcMap(col, 44, val);
+                calcS2Map(col, 44, val);
             } else if (aVal.startsWith("2110")) {
-                calcMap(col, 45, val);
+                calcS2Map(col, 45, val);
             } else if (aVal.startsWith("2111")) {
-                calcMap(col, 46, val);
+                calcS2Map(col, 46, val);
             } else if (aVal.startsWith("2112")) {
-                calcMap(col, 47, val);
+                calcS2Map(col, 47, val);
             } else if (aVal.startsWith("2199")) {
-                calcMap(col, 48, val);
+                calcS2Map(col, 48, val);
             }
         } else if (eq水工机械设备) {
-            calcMap(col, 49, val);
+            calcS2Map(col, 49, val);
         } else if (eq制造及检修维护设备) {
-            calcMap(col, 50, val);
+            calcS2Map(col, 50, val);
         } else if (eq生产管理用工器具) {
-            calcMap(col, 51, val);
+            calcS2Map(col, 51, val);
         } else if (eq运输设备) {
             if (aVal.startsWith("2501")) {
-                calcMap(col, 53, val);
+                calcS2Map(col, 53, val);
             } else if (aVal.startsWith("2502")) {
-                calcMap(col, 54, val);
+                calcS2Map(col, 54, val);
             } else if (aVal.startsWith("2503")) {
-                calcMap(col, 55, val);
+                calcS2Map(col, 55, val);
             } else if (aVal.startsWith("2504")) {
-                calcMap(col, 56, val);
+                calcS2Map(col, 56, val);
             } else if (aVal.startsWith("2599")) {
-                calcMap(col, 57, val);
+                calcS2Map(col, 57, val);
             }
         } else if (eq辅助生产用设备及器具) {
-            calcMap(col, 58, val);
+            calcS2Map(col, 58, val);
         } else if (eq房屋) {
-            calcMap(col, 59, val);
+            calcS2Map(col, 59, val);
         } else if (eq建筑物) {
-            calcMap(col, 60, val);
+            calcS2Map(col, 60, val);
         } else if (eq土地) {
-            calcMap(col, 61, val);
+            calcS2Map(col, 61, val);
         }
     }
 
@@ -736,9 +739,9 @@ public class ExcelUtil {
         return true;
     }
 
-    private static void calcMap(String col, int row, String val) {
+    private static void calcS2Map(String col, int row, String val) {
         BigDecimal decimalVal = isBlank(val) ? BigDecimal.ZERO : new BigDecimal(val);
-        valMap.merge(col + row, decimalVal, BigDecimal::add);
+        s2ValMap.merge(col + row, decimalVal, BigDecimal::add);
     }
 
     private static void calcS1Map(String col, int row, String val) {
@@ -746,23 +749,23 @@ public class ExcelUtil {
         s1ValMap.merge(col + row, decimalVal, BigDecimal::add);
     }
 
-    private static void calcMap(String col, int row, BigDecimal val) {
-        valMap.merge(col + row, val, BigDecimal::add);
+    private static void calcS2Map(String col, int row, BigDecimal val) {
+        s2ValMap.merge(col + row, val, BigDecimal::add);
     }
 
     private static void subColVal(String resultCol, String col1, String col2, int row) {
-        BigDecimal col1Val = valMap.getOrDefault(col1 + row, BigDecimal.ZERO);
-        BigDecimal col2Val = valMap.getOrDefault(col2 + row, BigDecimal.ZERO);
+        BigDecimal col1Val = s2ValMap.getOrDefault(col1 + row, BigDecimal.ZERO);
+        BigDecimal col2Val = s2ValMap.getOrDefault(col2 + row, BigDecimal.ZERO);
         BigDecimal resultVal = col1Val.subtract(col2Val);
-        calcMap(resultCol, row, resultVal);
+        calcS2Map(resultCol, row, resultVal);
     }
 
-    private static void completeMapVal() {
+    private static void completeS2ValMap() {
 
         //三、配电线路及设备 - 2.配电设备 - 10千伏以下，需要加上 配电设备-电动汽车充换电设备 项
         String[] cols = {"C", "D", "F", "G", "I", "J", "L", "M", "O", "P"};
         for (String col : cols) {
-            sumColVal(col, 24, 24, 25);
+            sumS2ColVal(col, 24, 24, 25);
         }
 
         //年初净值、年末净值
@@ -774,7 +777,7 @@ public class ExcelUtil {
         }
 
         cols = new String[]{"C", "D", "F", "G", "I", "J", "L", "M", "O", "P", "R", "S", "U", "V"};
-        int[][] rowStartEndArr = {
+        int[][] rowStartEnds = {
                 {5, 9}, //一、输电线路
                 {10, 15}, //二、变电设备
                 {17, 20}, //1.配电线路
@@ -783,49 +786,74 @@ public class ExcelUtil {
                 {34, 48}, //七、发电及供热设备
                 {52, 57}, //十一、运输设备
         };
-
-        for (int[] startEnd : rowStartEndArr) {
-            for (String col : cols) {
-                sumColVal(col, startEnd[0], startEnd[1]);
-            }
-        }
+        sumColVal(s2ValMap,cols,rowStartEnds);
 
         //三、配电线路及设备
         int[] heJiRows = {17, 21};
         for (String col : cols) {
-            sumColVal(col, 16, heJiRows);
+            sumS2ColVal(col, 16, heJiRows);
         }
 
         //合计
         heJiRows = new int[]{5, 10, 16, 26, 27, 28, 34, 49, 50, 51, 52, 58, 59, 60, 61};
         for (String col : cols) {
-            sumColVal(col, 62, heJiRows);
+            sumS2ColVal(col, 62, heJiRows);
         }
 
         //专用设备合计
         heJiRows = new int[]{5, 10, 16, 30, 31, 32, 37, 38, 39, 40, 41, 42, 43, 45, 46, 47, 48, 49, 53, 54, 56};
         for (String col : cols) {
-            sumColVal(col, 63, heJiRows);
+            sumS2ColVal(col, 63, heJiRows);
         }
 
         //通用设备合计
         heJiRows = new int[]{26, 27, 29, 33, 35, 36, 44, 50, 51, 55, 57, 58};
         for (String col : cols) {
-            sumColVal(col, 64, heJiRows);
+            sumS2ColVal(col, 64, heJiRows);
         }
 
         //通用设备合计
         heJiRows = new int[]{59, 60, 61};
         for (String col : cols) {
-            sumColVal(col, 65, heJiRows);
+            sumS2ColVal(col, 65, heJiRows);
         }
 
         //计算列合计值
         for (int i = 5; i <= 65; i++) {
             for (char c = 'B'; c <= 'T'; c += 3) {
-                sumRowVal(i, c, c + 2);
+                sumS2RowVal(i, c, c + 2);
             }
         }
+    }
+
+    private static void completeS1ValMap() {
+        int s1S2RowMap[][] = {
+                {5, 5}, {6, 6}, {7, 7}, {8, 8}, {9, 9}, {10, 10}, {11, 11}, {12, 12}, {13, 13}, {14, 14}, {15, 15},
+                {16, 17}, {17, 18}, {18, 19}, {19, 20}, {20, 21}, {21, 22}, {22, 23}, {23, 24}, {24, 25}, {25, 26},
+                {26, 27}, {27, 28}, {28, 34}, {29, 49}, {30, 50}, {31, 51}, {32, 52}, {33, 58}, {34, 59}, {35, 60},
+                {36, 61}, {37, 62}
+        };
+        for (int[] map : s1S2RowMap) {
+            copyValFromS2ToS1("B", map[1], "B", map[0]); //年初-资产原值
+            copyValFromS2ToS1("E", map[1], "R", map[0]); //年末-资产原值
+        }
+
+        String[] cols = new String[]{"C", "E", "F", "G", "H", "I", "K", "L", "M", "N", "O", "P", "Q", "S", "AO", "AP"};
+        int[][] rowStartEnds = {
+                {5, 9}, //一、输电线路
+                {10, 15}, //二、变电设备
+                {16, 19}, //三、配电线路
+                {20, 23}, //四、配电设备
+        };
+        sumColVal(s1ValMap,cols,rowStartEnds);
+
+
+
+    }
+
+    private static void copyValFromS2ToS1(String s2Col, int s2Row, String s1Col, int s1Row) {
+        BigDecimal s2Val = s2ValMap.get(s2Col + s2Row);
+        s1ValMap.put(s1Col + s1Row, s2Val);
     }
 
     private static void fillSheet2() {
@@ -839,7 +867,7 @@ public class ExcelUtil {
             row = sheet2.getRow(i - 1);
             for (int j = 1; j <= 21; j++) {
                 position = (char) ('A' + j) + String.valueOf(i);
-                BigDecimal bigDecimalVal = valMap.get(position);
+                BigDecimal bigDecimalVal = s2ValMap.get(position);
                 double doubleVal = bigDecimalVal == null ? 0 : bigDecimalVal.doubleValue();
                 cell = row.getCell(j);
                 cell.setCellValue(doubleVal);
@@ -847,38 +875,55 @@ public class ExcelUtil {
         }
     }
 
-    private static void sumColVal(String col, int rowStart, int rowEnd) {
+    private static void sumS2ColVal(String col, int rowStart, int rowEnd) {
         BigDecimal sumVal = BigDecimal.ZERO;
         for (int i = rowStart + 1; i <= rowEnd; i++) {
-            BigDecimal val = valMap.get(col + i);
+            BigDecimal val = s2ValMap.get(col + i);
             if (val != null) {
                 sumVal = sumVal.add(val);
             }
         }
-        valMap.put(col + rowStart, sumVal);
+        s2ValMap.put(col + rowStart, sumVal);
     }
 
-    private static void sumColVal(String col, int resultRow, int... sumRows) {
+    private static void sumColVal(Map<String, BigDecimal> valMap, String[] cols, int[][] rowStartEnds) {
+        for (String col : cols) {
+            for (int[] startEnd : rowStartEnds) {
+                BigDecimal sumVal = BigDecimal.ZERO;
+                int rowStart = startEnd[0];
+                int rowEnd = startEnd[1];
+                for (int i = rowStart + 1; i <= rowEnd; i++) {
+                    BigDecimal val = valMap.get(col + i);
+                    if (val != null) {
+                        sumVal = sumVal.add(val);
+                    }
+                }
+                valMap.put(col + rowStart, sumVal);
+            }
+        }
+    }
+
+    private static void sumS2ColVal(String col, int resultRow, int... sumRows) {
         BigDecimal sumVal = BigDecimal.ZERO;
         for (int row : sumRows) {
-            BigDecimal val = valMap.get(col + row);
+            BigDecimal val = s2ValMap.get(col + row);
             if (val != null) {
                 sumVal = sumVal.add(val);
             }
         }
-        valMap.put(col + resultRow, sumVal);
+        s2ValMap.put(col + resultRow, sumVal);
     }
 
-    private static void sumRowVal(int row, int colStart, int colEnd) {
+    private static void sumS2RowVal(int row, int colStart, int colEnd) {
         String rowStr = String.valueOf(row);
         BigDecimal sumVal = BigDecimal.ZERO;
         for (int i = colStart + 1; i <= colEnd; i++) {
-            BigDecimal val = valMap.get((char) i + rowStr);
+            BigDecimal val = s2ValMap.get((char) i + rowStr);
             if (val != null) {
                 sumVal = sumVal.add(val);
             }
         }
-        valMap.put((char) colStart + rowStr, sumVal);
+        s2ValMap.put((char) colStart + rowStr, sumVal);
     }
 
     private static String copyCell(Workbook newWorkbook, Cell oldCell, Cell newCell, Map<Integer, CellStyle> styleMap) {
