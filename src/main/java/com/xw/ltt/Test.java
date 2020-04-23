@@ -18,7 +18,7 @@ public class Test {
     public static final String WORK_DIR;
     public static int sheetNum;
     public static int titleRowNum;
-    public static boolean isCard = true;
+    public static boolean isCard;
     public static boolean isSuccess = true;
 
     static {
@@ -62,6 +62,8 @@ public class Test {
 //                System.out.println();
 //            }
 //        }
+
+        isCard = args.length > 0;
 
         for (; ; ) {
             System.out.println("请输入表的位置（大于0的整数）：");
