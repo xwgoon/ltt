@@ -17,6 +17,7 @@ public class Test {
 
     public static final String WORK_DIR;
     public static int sheetNum;
+    public static int sheetIndex;
     public static int titleRowNum;
     public static boolean isCard;
     public static boolean isSuccess = true;
@@ -66,18 +67,19 @@ public class Test {
         isCard = args.length > 0;
 
         for (; ; ) {
-            System.out.println("请输入表的位置（大于0的整数）：");
+            System.out.print("请输入表的位置（大于0的整数）：");
             Scanner in = new Scanner(System.in);
             try {
                 sheetNum = in.nextInt();
                 if (sheetNum <= 0) continue;
+                sheetIndex = sheetNum - 1;
                 break;
             } catch (InputMismatchException ignored) {
             }
         }
 
         for (; ; ) {
-            System.out.println("请输入表头行数（大于等于0的整数）：");
+            System.out.print("请输入表头行数（大于等于0的整数）：");
             Scanner in = new Scanner(System.in);
             try {
                 titleRowNum = in.nextInt();
@@ -87,11 +89,9 @@ public class Test {
             }
         }
 
-        System.out.println("开始合并...");
+        System.out.println("\n开始计算...");
         long startTime = System.currentTimeMillis();
 
-        Path excelDir = Paths.get(WORK_DIR + "原始数据");
-        List<Path> excelPaths = Files.list(excelDir).collect(Collectors.toList());
 
 //        Map<String, InputStream> excelFiles = new LinkedHashMap<>();
 //        try (Stream<Path> filePaths = Files.list(excelDir)) {
@@ -109,21 +109,23 @@ public class Test {
 //            throw new RuntimeException("遍历文件出错");
 //        }
 
-        File file = new File(WORK_DIR + "计算结果/合并结果.xlsx");
+
         try {
+            Path excelDir = Paths.get(WORK_DIR + "原始数据");
+            List<Path> excelPaths = Files.list(excelDir).collect(Collectors.toList());
+            File file = new File(WORK_DIR + "计算结果/计算结果.xlsx");
             ExcelUtil.mergeExcelFiles(file, excelPaths);
         } catch (IOException e) {
             e.printStackTrace();
-            throw new RuntimeException("合并文件出错");
         }
 
         if (isSuccess) {
-            System.out.println("合并成功，用时" + (System.currentTimeMillis() - startTime) / 1000 + "秒。\n");
+            System.out.println("计算成功，用时" + (System.currentTimeMillis() - startTime) / 1000 + "秒。");
         } else {
-            System.out.println("合并失败。\n");
+            System.out.println("计算失败。");
         }
 
-        System.out.println("请按回车键结束...");
+        System.out.println("\n请按回车键结束...");
         System.in.read();
     }
 

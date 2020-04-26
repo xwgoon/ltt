@@ -3,7 +3,6 @@ package com.xw.ltt.excel;
 import com.sun.jna.platform.win32.Advapi32Util;
 import com.sun.jna.platform.win32.WinReg;
 import com.xw.ltt.Test;
-import org.apache.poi.EncryptedDocumentException;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.streaming.SXSSFSheet;
@@ -19,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class ExcelUtil {
 
@@ -122,6 +122,10 @@ public class ExcelUtil {
     private static final Map<String, BigDecimal> S1ValMap = new HashMap<>();
     private static final Map<String, BigDecimal> S0ValMap = new HashMap<>();
 
+    private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private static final CompletionService<Sheet> completionService = new ExecutorCompletionService<>(executorService);
+
+
     //资产类别：输电线路,变电设备,配电线路,配电设备-其他,配电设备-电动汽车充换电设备,用电计量设备,通信线路及设备,
     // 自动化控制设备、信息设备及仪器仪表,发电及供热设备,水工机械设备,制造及检修维护设备,生产管理用工器具,运输设备,辅助生产用设备及器具,
     // 房屋,建筑物,土地
@@ -155,28 +159,24 @@ public class ExcelUtil {
     private static boolean le20141231;
 
     private static Workbook createBook(Path path, String fileName) {
-        System.out.println("正在合并【" + fileName + "】...");
         try (InputStream in = Files.newInputStream(path)) { //用完流后要关闭，否则后面无法删除临时文件夹
             Workbook book = WorkbookFactory.create(in);
             if (Test.sheetNum > book.getNumberOfSheets()) {
-                System.out.println("您输入的表位置" + Test.sheetNum + "非法，【" + fileName + "】文件共有"
-                        + book.getNumberOfSheets() + "张表。");
-                Test.isSuccess = false;
-                return null;
+                String msg = "您输入的表位置" + Test.sheetNum + "非法，【" + fileName + "】文件共有" + book.getNumberOfSheets() + "张表。";
+                throw new RuntimeException(msg);
             }
             return book;
-        } catch (IOException | EncryptedDocumentException e) {
+        } catch (Exception e) {
             e.printStackTrace();
+            throw new RuntimeException(e.getMessage());
         }
-        return null;
     }
 
-    private static SXSSFWorkbook createMainBook(Path path, int sheetIndex, String fileName) {
+    private static SXSSFWorkbook createMainBook(Path path, String fileName) {
         Workbook book = createBook(path, fileName);
-        if (book == null) return null;
         SXSSFWorkbook mainBook = new SXSSFWorkbook((XSSFWorkbook) book);
-        SXSSFSheet mainSheet = mainBook.getSheetAt(sheetIndex);
-        Sheet sheet = book.getSheetAt(sheetIndex);
+        SXSSFSheet mainSheet = mainBook.getSheetAt(Test.sheetIndex);
+        Sheet sheet = book.getSheetAt(Test.sheetIndex);
 
         for (int k = 0; k < mainBook.getNumberOfSheets(); ) {
             if (!mainBook.getSheetName(k).equals(mainSheet.getSheetName())) {
@@ -206,20 +206,25 @@ public class ExcelUtil {
         return mainBook;
     }
 
-    private static Path createXlsxFile(Path xlsFile) throws Exception {
-        if (excelCnvDir == null) {
-            excelCnvDir = Advapi32Util.registryGetStringValue(
-                    WinReg.HKEY_LOCAL_MACHINE, //HKEY
-                    "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\excel.exe", //Key
-                    "Path"
-            );
+    private static Path createXlsxFile(Path xlsFile) {
+        try {
+            if (excelCnvDir == null) {
+                excelCnvDir = Advapi32Util.registryGetStringValue(
+                        WinReg.HKEY_LOCAL_MACHINE, //HKEY
+                        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\excel.exe", //Key
+                        "Path"
+                );
+                tmpDir = Files.createTempDirectory("ltt_");
+            }
+            String xlsxFile = tmpDir + "\\" + xlsFile.getFileName() + "x";
+            String cmd = excelCnvDir + "excelcnv.exe -oice \"" + xlsFile + "\" \"" + xlsxFile + "\"";
+            Process process = Runtime.getRuntime().exec(cmd);
+            process.waitFor();
+            return Paths.get(xlsxFile);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e.getMessage());
         }
-        tmpDir = Files.createTempDirectory("ltt_");
-        String xlsxFile = tmpDir + "\\" + xlsFile.getFileName() + "x";
-        String cmd = excelCnvDir + "excelcnv.exe -oice \"" + xlsFile + "\" \"" + xlsxFile + "\"";
-        Process process = Runtime.getRuntime().exec(cmd);
-        process.waitFor();
-        return Paths.get(xlsxFile);
     }
 
     public static void mergeExcelFiles(File file, List<Path> excelPaths) throws Exception {
@@ -238,8 +243,6 @@ public class ExcelUtil {
                 mainSheetLastRowNum = 3;
             }
         }
-
-        int sheetIndex = Test.sheetNum - 1;
 
         try {
 //            for (int i = 0; i < excelPaths.size(); i++) {
@@ -261,24 +264,57 @@ public class ExcelUtil {
 //                if (mainBook == null) return;
 //            }
 
+            boolean hasTask = false;
             for (int i = 0; i < excelPaths.size(); i++) {
                 Path path = excelPaths.get(i);
                 String fileName = path.getFileName().toString();
-                if (fileName.endsWith("xls")) {
-                    path = createXlsxFile(path);
+                System.out.println("正在合并【" + fileName + "】...");
+                Sheet sheet = null;
+
+                if (i == 0) {
+                    if (!Test.isCard) {
+                        hasTask = createNextSheet(excelPaths, i);
+                        if (fileName.endsWith("xls")) {
+                            path = createXlsxFile(path);
+                        }
+                        mainBook = createMainBook(path, fileName);
+                        mainSheet = mainBook.getSheetAt(0);
+                        continue;
+                    } else {
+                        sheet = createSheet(path);
+                    }
                 }
 
-                if (!Test.isCard && i == 0) {
-                    mainBook = createMainBook(path, sheetIndex, fileName);
-                    if (mainBook == null) return;
-                    mainSheet = mainBook.getSheetAt(0);
-                    continue;
+//                if (!Test.isCard && i == 0) {
+//                    hasTask=createNextSheet(excelPaths, i);
+//                    Path path = excelPaths.get(0);
+//                    String fileName = path.getFileName().toString();
+//                    if (fileName.endsWith("xls")) {
+//                        path = createXlsxFile(path);
+//                    }
+//                    mainBook = createMainBook(path, fileName);
+//                    if (mainBook == null) return;
+//                    mainSheet = mainBook.getSheetAt(0);
+//                    continue;
+//                }
+//
+//
+//                if(i==0){
+//                    sheet = createSheet(excelPaths.get(i));
+//                }else if (hasTask) {
+//                    sheet = await();
+//                    hasTask=createNextSheet(excelPaths, i);
+//                }
+
+                if (hasTask) {
+                    sheet = await();
                 }
 
-                Workbook book = createBook(path, fileName);
-                if (book == null) return;
-                Sheet sheet = book.getSheetAt(sheetIndex);
-                copySheets(mainBook, mainSheet, sheet);
+                hasTask = createNextSheet(excelPaths, i);
+
+                if (sheet != null) {
+                    copySheets(mainBook, mainSheet, sheet);
+                }
             }
 
 //        for (InputStream fin : list) {
@@ -291,6 +327,8 @@ public class ExcelUtil {
 //        }
 
             if (Test.isCard) {
+                System.out.println("正在汇总...");
+
                 completeS1ValMap();
                 completeS0ValMap();
 
@@ -300,11 +338,46 @@ public class ExcelUtil {
 
             writeFile(mainBook, file);
         } catch (Exception e) {
-            Test.isSuccess = false;
             e.printStackTrace();
+            Test.isSuccess = false;
         } finally {
+            executorService.shutdown();
             deleteTempDir();
         }
+    }
+
+    private static Sheet await() {
+        try {
+            Future<Sheet> future = completionService.take(); //blocks if none available
+            return future.get();
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e.getMessage());
+        }
+    }
+
+    private static boolean createNextSheet(List<Path> excelPaths, int curIndex) {
+        int nextIndex = curIndex + 1;
+        if (nextIndex < excelPaths.size()) {
+            completionService.submit(() -> createSheet(excelPaths.get(nextIndex)));
+            return true;
+        }
+        return false;
+    }
+
+    private static Sheet createSheet(Path path) {
+//        long start = System.currentTimeMillis();
+
+        String fileName = path.getFileName().toString();
+        if (fileName.endsWith("xls")) {
+            path = createXlsxFile(path);
+        }
+        Workbook book = createBook(path, fileName);
+        Sheet sheet = book.getSheetAt(Test.sheetIndex);
+
+//        System.out.println(Thread.currentThread() + "加载【" + fileName + "】耗时：" + (System.currentTimeMillis() - start));
+
+        return sheet;
     }
 
     private static void deleteTempDir() throws IOException {
@@ -371,7 +444,9 @@ public class ExcelUtil {
     private static void copyRow(Workbook newWorkbook, Row srcRow, Row destRow, Map<Integer, CellStyle> styleMap,
                                 Set<CellRangeAddress> mergedRegions) {
         destRow.setHeight(srcRow.getHeight());
-        Arrays.fill(cellValArr, null);
+        if (Test.isCard) {
+            Arrays.fill(cellValArr, null);
+        }
         for (short j = srcRow.getFirstCellNum(); j <= srcRow.getLastCellNum(); j++) {
             Cell oldCell = srcRow.getCell(j);
             Cell newCell = destRow.getCell(j);
@@ -379,7 +454,11 @@ public class ExcelUtil {
                 if (newCell == null) {
                     newCell = destRow.createCell(j);
                 }
-                cellValArr[j] = copyCell(newWorkbook, oldCell, newCell, styleMap);
+                String val = copyCell(newWorkbook, oldCell, newCell, styleMap);
+                if (Test.isCard) {
+                    cellValArr[j] = val;
+                }
+
 //                CellRangeAddress mergedRegion = getMergedRegion(srcRow.getSheet(), srcRow.getRowNum(),
 //                        (short) oldCell.getColumnIndex());
 //
@@ -398,7 +477,9 @@ public class ExcelUtil {
 //                }
             }
         }
-        calcCell();
+        if (Test.isCard) {
+            calcCell();
+        }
     }
 
     private static void calcCell() {
